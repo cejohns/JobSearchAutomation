@@ -41,12 +41,14 @@ app.post("/api/scrape-jobs", async (req, res) => {
 });
 
 /// Scrape Google Jobs (hardcoded URL)
+// Endpoint to scrape Google Jobs
 app.post("/api/scrape-google-jobs", async (req, res) => {
     try {
-        const jobs = await scrapeGoogleJobs(); // No URL needed (hardcoded in scraper)
-        res.json(jobs);
+        const jobs = await scrapeGoogleJobs();
+        res.status(200).json({ success: true, jobs });
     } catch (error) {
-        res.status(500).json({ error: "Failed to scrape Google Jobs" });
+        console.error("Error in /api/scrape-google-jobs:", error);
+        res.status(500).json({ success: false, error: "Failed to scrape jobs" });
     }
 });
 

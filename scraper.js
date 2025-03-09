@@ -13,13 +13,13 @@ const chromeDriverPath = path.join(__dirname, "chromedriver-win64", "chromedrive
 
 // Set up Chrome options
 const options = new chrome.Options();
-options.addArguments("--headless"); // Run in headless mode
+options.addArguments("--headless");
 options.addArguments("--disable-gpu");
 options.addArguments("--no-sandbox");
-options.addArguments("--ignore-certificate-errors-spki-list"); // More secure SSL handling
+options.addArguments("--ignore-certificate-errors-spki-list");
 options.addArguments("--disable-dev-shm-usage");
 options.addArguments("--ssl-version-min=tls1.2");
-options.addArguments("--disable-blink-features=AutomationControlled"); // Avoid detection
+options.addArguments("--disable-blink-features=AutomationControlled");
 
 // Connect to SQLite database
 const db = new sqlite3.Database("jobs.db");
@@ -89,7 +89,6 @@ function trackApplicationStatus() {
         rows.forEach((row) => {
             const { id, title, company } = row;
             try {
-                // Simulating response tracking (to be replaced with actual tracking logic)
                 const responseStatus = id % 2 === 0 ? "Interview Scheduled" : "No Response";
                 db.run("UPDATE job_listings SET status=? WHERE id=?", [responseStatus, id]);
                 console.log(`Updated status for ${title} at ${company}: ${responseStatus}`);
@@ -110,7 +109,6 @@ async function autoApply() {
         }
         console.log(`Found ${rows.length} jobs to apply for.`);
 
-        // Process jobs in parallel
         await Promise.all(rows.map(async (row) => {
             const { id, title, company, link, industry } = row;
             console.log(`Applying for ${title} at ${company} (Link: ${link})`);
@@ -119,31 +117,36 @@ async function autoApply() {
                 const driver = await new Builder()
                     .forBrowser("chrome")
                     .setChromeOptions(options)
+                    .setChromeService(new chrome.ServiceBuilder(chromeDriverPath))
                     .build();
 
                 await driver.get(link);
-                await driver.sleep(3000); // Wait for the page to load
+                await driver.sleep(3000);
 
-                // Simulate clicking the apply button
                 const applyButton = await driver.findElement(By.xpath("//button[contains(text(),'Apply')]"));
                 await applyButton.click();
                 await driver.sleep(3000);
 
-                // Generate cover letter and optimize resume
                 const coverLetter = await generateCoverLetter(title, company);
                 const optimizedResume = await optimizeResume(title, company);
                 const resumePath = RESUME_STORAGE[industry] || path.join(__dirname, "resumes", "default_resume.pdf");
 
-                // Fill out the application form
-                const coverLetterField = await driver.findElement(By.xpath("//textarea[contains(@name, 'coverLetter')]"));
-                await coverLetterField.sendKeys(coverLetter);
+                try {
+                    const coverLetterField = await driver.findElement(By.xpath("//textarea[contains(@name, 'coverLetter')]"));
+                    await coverLetterField.sendKeys(coverLetter);
+                } catch (error) {
+                    console.error("Cover letter field not found:", error);
+                }
 
-                const resumeField = await driver.findElement(By.xpath("//input[contains(@name, 'resume')]"));
-                await resumeField.sendKeys(resumePath);
+                try {
+                    const resumeField = await driver.findElement(By.xpath("//input[contains(@name, 'resume')]"));
+                    await resumeField.sendKeys(resumePath);
+                } catch (error) {
+                    console.error("Resume field not found:", error);
+                }
 
                 await driver.sleep(2000);
 
-                // Submit the application
                 const submitButton = await driver.findElement(By.xpath("//button[contains(text(),'Submit')]"));
                 await submitButton.click();
 
@@ -159,155 +162,81 @@ async function autoApply() {
     });
 }
 
-// Function to scrape jobs from a given URL
-async function scrapeJobs(url) {
-    let driver = await new Builder()
-        .forBrowser("chrome")
-        .setChromeOptions(options)
-        .build();
-
-    let jobs = [];
+// Function to scrape Google Jobs
+async function scrapeGoogleJobs() {
+    const url = "https://www.google.com/search?q=software+engineer+jobs&ibp=htl;jobs";
+    let driver;
 
     try {
+        console.log("Initializing ChromeDriver...");
+        driver = await new Builder()
+            .forBrowser("chrome")
+            .setChromeOptions(options)
+            .setChromeService(new chrome.ServiceBuilder(chromeDriverPath))
+            .build();
+
+        console.log("Navigating to Google Jobs...");
         await driver.get(url);
-        await driver.wait(until.elementsLocated(By.css(".job-listing, .job-card")), 10000); // Flexible selectors
-        let jobElements = await driver.findElements(By.css(".job-listing, .job-card"));
+        await driver.wait(until.elementsLocated(By.css(".job-title, .company-name")), 10000);
+
+        console.log("Extracting job listings...");
+        let jobElements = await driver.findElements(By.css(".job-listing"));
+        let jobs = [];
 
         for (let jobElement of jobElements) {
             try {
-                let title = await jobElement.findElement(By.css(".job-title, .title")).getText();
-                let company = await jobElement.findElement(By.css(".company-name, .company")).getText();
+                let title = await jobElement.findElement(By.css(".job-title")).getText();
+                let company = await jobElement.findElement(By.css(".company-name")).getText();
                 jobs.push({ title, company, status: "Not Applied" });
             } catch (error) {
                 console.error("Error extracting job details:", error);
             }
         }
-    } catch (error) {
-        console.error("Error scraping jobs:", error);
-    } finally {
-        await driver.quit();
-    }
 
-    return jobs;
-}
-
-// Function to scrape Google Jobs
-async function scrapeGoogleJobs() {
-    const url = "https://www.google.com/search?q=software+engineer+jobs&ibp=htl;jobs";
-    let driver = await new Builder()
-        .forBrowser("chrome")
-        .setChromeOptions(options)
-        .build();
-
-    let jobs = [];
-
-    try {
-        await driver.get(url);
-        await driver.wait(until.elementsLocated(By.css(".pE8vnd, .job-listing")), 10000); // Flexible selectors
-
-        // Extract job listings
-        let jobElements = await driver.findElements(By.css(".pE8vnd, .job-listing"));
-        for (let jobElement of jobElements) {
-            try {
-                let title = await jobElement.findElement(By.css(".BjJfJf, .title")).getText();
-                let company = await jobElement.findElement(By.css(".vNEEBe, .company")).getText();
-                jobs.push({ title, company, status: "Not Applied" });
-            } catch (error) {
-                console.error("Error extracting Google job details:", error);
-            }
-        }
-    } catch (error) {
-        console.error("Error scraping Google Jobs:", error);
-    } finally {
-        await driver.quit();
-    }
-
-    return jobs;
-}
-
-// Function to scrape ZipRecruiter
-async function scrapeZipRecruiter() {
-    const apiKey = process.env.ZIPRECRUITER_API_KEY;
-    if (!apiKey) {
-        throw new Error("ZIPRECRUITER_API_KEY is missing");
-    }
-
-    const url = `https://api.ziprecruiter.com/jobs/v1?search=Software+Engineer&location=USA&api_key=${apiKey}`;
-
-    try {
-        const response = await axios.get(url);
-        const jobs = response.data.jobs.map((job) => ({
-            title: job.name,
-            company: job.hiring_company.name,
-            status: "Not Applied",
-        }));
+        console.log(`Scraped ${jobs.length} jobs.`);
         return jobs;
     } catch (error) {
-        console.error("Error scraping ZipRecruiter:", error);
-        return [];
-    }
-}
-
-async function scrapeAngelList() {
-    const apiKey = process.env.ANGEL_LIST_API_KEY;
-    if (!apiKey) {
-        throw new Error("ANGEL_LIST_API_KEY is missing");
-    }
-
-    const url = `https://api.angel.co/1/jobs?access_token=${apiKey}`;
-    try {
-        const response = await axios.get(url);
-        return response.data.map((job) => ({
-            title: job.title,
-            company: job.startup.name,
-            status: "Not Applied",
-        }));
-    } catch (error) {
-        console.error("Error scraping AngelList:", error);
-        throw new Error("Failed to scrape AngelList");
-    }
-}
-
-async function scrapeDice(url) {
-    let driver = await new Builder()
-        .forBrowser("chrome")
-        .setChromeOptions(options)
-        .build();
-
-    let jobs = [];
-
-    try {
-        await driver.get(url);
-        await driver.wait(until.elementsLocated(By.css(".search-result, .job-listing")), 10000); // Flexible selectors
-
-        // Extract job listings
-        let jobElements = await driver.findElements(By.css(".search-result, .job-listing"));
-        for (let jobElement of jobElements) {
-            try {
-                let title = await jobElement.findElement(By.css(".title, .job-title")).getText();
-                let company = await jobElement.findElement(By.css(".employer, .company")).getText();
-                jobs.push({ title, company, status: "Not Applied" });
-            } catch (error) {
-                console.error("Error extracting Dice job details:", error);
-            }
-        }
-    } catch (error) {
-        console.error("Error scraping Dice:", error);
-        throw new Error("Failed to scrape Dice");
+        console.error("Error scraping Google Jobs:", error);
+        throw new Error("Failed to scrape jobs");
     } finally {
-        await driver.quit();
+        if (driver) {
+            await driver.quit();
+        }
     }
+}
+// Main function to scrape, apply, and track jobs
+async function main() {
+    try {
+        const jobs = await scrapeGoogleJobs();
+        console.log(`Scraped ${jobs.length} jobs from Google Jobs.`);
 
-    return jobs;
+        db.serialize(() => {
+            const stmt = db.prepare("INSERT INTO job_listings (title, company, status) VALUES (?, ?, ?)");
+            jobs.forEach(job => {
+                stmt.run(job.title, job.company, job.status);
+            });
+            stmt.finalize();
+        });
+
+        await autoApply();
+        trackApplicationStatus();
+    } catch (error) {
+        console.error("Error in main function:", error);
+    }
 }
 
-// Export functions
+// Run the main function
+main();
+
 module.exports = {
     scrapeJobs,
     autoApply,
     trackApplicationStatus,
-    scrapeGoogleJobs,
+    scrapeGoogleJobs, // Add this line
     scrapeZipRecruiter,
+    scrapeMonster,
+    scrapeCareerBuilder,
+    scrapeWeWorkRemotely,
     scrapeAngelList,
     scrapeDice,
 };

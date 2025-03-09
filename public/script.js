@@ -38,35 +38,44 @@ document.getElementById("scrapeForm").addEventListener("submit", async (e) => {
             headers: {
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify(requestBody), // Send the request body
+            body: JSON.stringify(requestBody),
         });
 
         if (!response.ok) {
-            throw new Error("Failed to scrape jobs");
+            const errorData = await response.json();
+            throw new Error(errorData.error || "Failed to scrape jobs");
         }
 
         const jobs = await response.json();
         displayJobs(jobs);
     } catch (error) {
         console.error("Error:", error);
-        alert("Failed to scrape jobs. Please try again.");
+        displayError(error.message);
     }
 });
 
-// Function to display scraped jobs
-function displayJobs(jobs) {
+function displayJobs(response) {
     const jobList = document.getElementById("jobList");
     jobList.innerHTML = ""; // Clear previous results
 
-    if (jobs.length === 0) {
+    if (!response.success || !response.jobs || response.jobs.length === 0) {
         jobList.innerHTML = "<li>No jobs found.</li>";
         return;
     }
 
-    jobs.forEach((job) => {
+    response.jobs.forEach((job) => {
         const li = document.createElement("li");
         li.textContent = `${job.title} - ${job.company} (${job.status})`;
         jobList.appendChild(li);
     });
 }
-// Rest of the code remains the same...
+
+function displayError(message) {
+    const errorMessage = document.getElementById("errorMessage");
+    if (errorMessage) {
+        errorMessage.textContent = message;
+        errorMessage.style.display = "block";
+    } else {
+        console.error("Error message element not found.");
+    }
+}
