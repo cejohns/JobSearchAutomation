@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Scraper and Automation</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Job Scraper and Automation</h1>
+
+        <!-- Form to select job board and input URL -->
+        <div class="section">
+            <h2>Scrape Jobs</h2>
+            <form id="scrapeForm">
+                <label for="jobBoard">Select Job Board:</label>
+                <select id="jobBoard">
+                    <option value="google">Google Jobs</option>
+                    <option value="ziprecruiter">ZipRecruiter</option>
+                    <option value="monster">Monster</option>
+                    <option value="careerbuilder">CareerBuilder</option>
+                    <option value="weworkremotely">We Work Remotely</option>
+                    <option value="angellist">AngelList</option>
+                    <option value="dice">Dice</option>
+                </select>
+
+               
+
+                <button type="submit">Scrape Jobs</button>
+            </form>
+        </div>
+
+        <!-- Display scraped job listings -->
+        <div class="section">
+            <h2>Scraped Job Listings</h2>
+            <ul id="jobList"></ul>
+        </div>
+
+        <!-- Buttons to start auto-apply and track status -->
+        <div class="section">
+            <h2>Automation</h2>
+            <button id="autoApplyButton">Start Auto-Apply</button>
+            <button id="trackStatusButton">Track Application Status</button>
+        </div>
+
+        <!-- Display application status -->
+        <div class="section">
+            <h2>Application Status</h2>
+            <ul id="statusList"></ul>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
